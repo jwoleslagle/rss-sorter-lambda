@@ -4,6 +4,7 @@
   "description": "",
   "main": "rss-sorter-lambda.js",
   "dependencies": {
+    "dotenv": "^6.0.0",
     "pg": "^7.4.3",
     "rss-parser": "^3.4.2"
   },
