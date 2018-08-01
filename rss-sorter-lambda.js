@@ -50,12 +50,11 @@ function writeItemsToDb(newFeed, oldGuids) {
 }
 
 (async() => {
-  let guidArray, feed = [];
   let RSSFeedURL = 'https://www.njtransit.com/rss/RailAdvisories_feed.xml';
-  feed = incomingFeed(RSSFeedURL);
-  guidArray = last20Items();
-  await feed;
-  await guidArray;
+  let feedPromise = incomingFeed(RSSFeedURL);
+  let guidPromise = last20Items();
+  let feed = await feedPromise;
+  let guidArray = await guidPromise;
   writeItemsToDb(feed, guidArray);
 })();
 
