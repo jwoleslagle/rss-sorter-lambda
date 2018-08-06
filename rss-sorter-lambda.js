@@ -2,13 +2,13 @@
 
 require('dotenv').config()
 
-const { Pool } = require('pg')
+const { Client } = require('pg');
 let Parser = require('rss-parser');
 let parser = new Parser();
 
-// pools will use environment variables
+// clients will use environment variables
 // for connection information
-const pool = new Pool();
+const client = new Client();
 
 async function incomingFeed(feedURL) {
   try {
@@ -24,10 +24,12 @@ async function incomingFeed(feedURL) {
 async function last20Items() {
   try {
     const guidArr = [];
-    let last20 = await pool.query('SELECT guid FROM "feedDetails" ORDER BY "pubDate" DESC LIMIT 20');
+    await client.connect();
+    let last20 = await client.query('SELECT guid FROM "feedDetails" ORDER BY "pubDate" DESC LIMIT 20');
     last20.rows.forEach(guid => {
       guidArr.push(guid);
     })
+    client.end();
     return last20;
   }
   catch(e) {
@@ -35,18 +37,27 @@ async function last20Items() {
   }
 }
 
-function writeItemsToDb(newFeed, oldGuids) {
+async function writeItemsToDb(newFeed, oldGuids) {
+  let itemsArr = [];
   newFeed.items.forEach((item) => {
-    //console.log(item.title + ':' + item.link)
-    if (oldGuids.includes(item.guid) === false) {
-      try {
-        pool.query(`INSERT INTO "feedDetails" ("title", "description", "link", "pubDate", "guid", "feedID") VALUES (${item.title}, ${item.description}, ${item.link}, ${item.pubDate}, ${item.guid}, 1)`, [1])
-      }
-      catch(e) {
-        console.log(`DB write error: ${e}`);
-      }
+    if (oldGuids.rows.includes(item.guid) === false) {
+      const itemToAdd = `('${item.title}', '${item.content}', '${item.link}', '${item.pubDate}', '${item.guid}')`;
+      itemsArr.push(itemToAdd);
     }
   })
+  console.log(itemsArr);
+  let items = itemsArr.join();
+  console.log(items);
+  // try {
+  //   const client2 = new Client();
+  //   await client2.connect();
+  //   await client2.query(`INSERT INTO "feedDetails" ("title", "description", "link", "pubDate", "guid", "feedID")
+  //   VALUES ${items};`);
+  //   await client2.end();
+  // }
+  // catch(e) {
+  //   console.log(`DB write error: ${e}`);
+  // }
 }
 
 (async() => {
