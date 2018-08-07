@@ -11,6 +11,7 @@ let parser = new Parser();
 const client = new Client();
 
 async function incomingFeed(feedURL) {
+const t0 = process.hrtime();
   console.log('Parse incoming feed started.');
   try {
     let feedItems = await parser.parseURL(feedURL);
@@ -20,10 +21,12 @@ async function incomingFeed(feedURL) {
   catch(e) {
     console.log(`Incoming feed error: ${e}`);
   }
-  console.log('Parse incoming feed finished.');
+  const t1 = process.hrtime();
+  console.log('Parse incoming feed finished in ' + (t1 - t0) + ' ms.');
 }
 
 async function last20Items() {
+  const t0 = process.hrtime();
   console.log('Get last 20 guids started.');
   try {
     const guidArr = [];
@@ -38,24 +41,24 @@ async function last20Items() {
   catch(e) {
     console.log(`DB read error: ${e}`);
   }
-  console.log('Get last 20 guids finished.');
+  const t1 = process.hrtime();
+  console.log('Get last 20 guids finished in ' + (t1 - t0) + ' ms.');
 }
 
 async function writeItemsToDb(newFeed, oldGuids) {
   //TODO: Split this into two functions, one for filter, second for write.
+  const t0 = process.hrtime();
   console.log('Feed dupe filter started.');
   let itemsArr = [];
   newFeed.items.forEach((item) => {
     if (oldGuids.rows.includes(item.guid) === false) {
-      const itemToAdd = ` ('${item.title}', '${item.content}', '${item.link}', '${item.pubDate}', '${item.guid}')`;
+      const itemToAdd = ` ('${item.title}', '${item.content}', '${item.link}', '${item.pubDate}', '${item.guid}', 1)`;
       itemsArr.push(itemToAdd);
     }
   })
   console.log('Feed dupe filter finished.');
-  console.log(itemsArr);
   let items = itemsArr.join();
   items = items + ';';
-  console.log(items);
   console.log('Write feed to DB started.')
   try {
     const client2 = new Client();
@@ -67,7 +70,8 @@ async function writeItemsToDb(newFeed, oldGuids) {
   catch(e) {
     console.log(`DB write error: ${e}`);
   }
-  console.log('Write feed to DB finished.')
+  const t1 = process.hrtime();
+  console.log('Write feed to DB finished in ' + (t1 - t0) + ' ms.');
 }
 
 (async() => {
