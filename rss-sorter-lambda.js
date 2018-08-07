@@ -30,7 +30,7 @@ async function incomingFeed(feedURL) {
   try {
     let feedItemsPromise = parser.parseURL(feedURL);
     let feedItems = await feedItemsPromise;
-    console.log('Parse incoming feed contains ' + feedItems.length + ' items and finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
+    console.log('Parse incoming feed contains ' + feedItems.items.length + ' items and finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
     return feedItems
   }
   catch(e) {
@@ -80,13 +80,17 @@ function filterArray(newFeed, oldGuids) {
   return items;
 }
 
-async function writeItemsToDb(writeItems) {
+async function writeItemsToDb(writeItems, startTime) {
   const t0 = process.hrtime();
   console.log('Write feed to DB started.')
   try {
     await client.query(`INSERT INTO "feedDetails" ("title", "description", "link", "pubDate", "guid", "feedID")
-      VALUES ${writeItems};`);
-    console.log('Write feed to DB finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
+      VALUES ${writeItems};`)
+    .then((res) => {
+      client.end();
+      console.log('writeItemsToDb wrote ' + res.rowCount  + ' rows and finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
+      console.log('RSS Sorter Lambda took ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds to run.')
+    })
   }
   catch(e) {
     console.log(`DB write error: ${e}`);
@@ -95,6 +99,7 @@ async function writeItemsToDb(writeItems) {
 }
 
 (async() => {
+  const overallT0 = process.hrtime();
   let RSSFeedURL = 'https://www.njtransit.com/rss/RailAdvisories_feed.xml';
   let feedPromise = incomingFeed(RSSFeedURL);
   let guidArrayPromise = last100Items();
@@ -102,8 +107,7 @@ async function writeItemsToDb(writeItems) {
     let feed = values[0];
     let oldGuidArray = values[1]; 
     const writeString = filterArray(feed, oldGuidArray);
-    //writeItemsToDb(writeString);
+    writeItemsToDb(writeString, overallT0);
   })
-  client.end();
 })();
 
