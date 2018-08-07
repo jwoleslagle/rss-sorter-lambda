@@ -30,7 +30,7 @@ async function incomingFeed(feedURL) {
   try {
     let feedItemsPromise = parser.parseURL(feedURL);
     let feedItems = await feedItemsPromise;
-    console.log('Parse incoming feed finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
+    console.log('Parse incoming feed contains ' + feedItems.length + ' items and finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
     return feedItems
   }
   catch(e) {
@@ -62,8 +62,8 @@ async function last100Items() {
 // Eliminates dupes and other irrelevant rows from the feed. 
 function filterArray(newFeed, oldGuids) {
   const t0 = process.hrtime();
-  const startCount = newFeed.length;
-  console.log('Feed dupe filter started with ' + startCount + ' items.');
+  const startCount = newFeed.items.length;
+  console.log('filterArray function started with ' + startCount + ' items.');
   let itemsArr = [];
   newFeed.items.forEach((item) => {
     if ((oldGuids.rows.includes(item.guid) === false) && 
@@ -73,10 +73,10 @@ function filterArray(newFeed, oldGuids) {
       itemsArr.push(itemToAdd);
     }
   })
-  const endCount = items.length;
+  const endCount = itemsArr.length;
   let items = itemsArr.join();
   items = items + ';';
-  console.log('filterArray function removed ' + (startCount - endcount) + ' items and finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
+  console.log('filterArray function removed ' + (startCount - endCount) + ' items and finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
   return items;
 }
 
@@ -97,11 +97,13 @@ async function writeItemsToDb(writeItems) {
 (async() => {
   let RSSFeedURL = 'https://www.njtransit.com/rss/RailAdvisories_feed.xml';
   let feedPromise = incomingFeed(RSSFeedURL);
-  let guidPromise = last100Items();
-  let feed = await feedPromise;
-  let guidArray = await guidPromise;
-  //const writeString = filterArray(feed, guidArray);
-  //writeItemsToDb(writeString);
+  let guidArrayPromise = last100Items();
+  await Promise.all([feedPromise, guidArrayPromise]).then((values) => {
+    let feed = values[0];
+    let oldGuidArray = values[1]; 
+    const writeString = filterArray(feed, oldGuidArray);
+    //writeItemsToDb(writeString);
+  })
   client.end();
 })();
 
