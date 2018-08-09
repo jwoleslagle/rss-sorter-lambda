@@ -59,26 +59,62 @@ async function last100Items() {
 
 }
 
+// Partial application function for use with dupe checking portion of filterArray() function.
+function filterDuplicates(oldGuidArray) { // get the array to filter by
+  return function(val) { // return a filtering function
+      return oldGuidArray.rows.includes(val) === false;
+  };
+}
+
+// Remove items matching certain keywords from the array.
+function filterKeywords(itm) {
+  if ((itm.content.includes('NJ TRANSIT Printable Timetables')) &&
+      (itm.content.includes('Service Adjustments Required to Advance Positive Train Control (PTC)'))) 
+    { return false } 
+  return true;
+}
+
 // Eliminates dupes and other irrelevant rows from the feed. 
 function filterArray(newFeed, oldGuids) {
   const t0 = process.hrtime();
   const startCount = newFeed.items.length;
   console.log('filterArray function started with ' + startCount + ' items.');
-  let itemsArr = [];
-  newFeed.items.forEach((item) => {
-    if ((oldGuids.rows.includes(item.guid) === false) && 
-       (item.content.includes('NJ TRANSIT Printable Timetables') === false) &&
-       (item.content.includes('Service Adjustments Required to Advance Positive Train Control (PTC)') === false)) {
-      const itemToAdd = ` ('${item.title}', '${item.content}', '${item.link}', '${item.pubDate}', '${item.guid}', 1)`;
-      itemsArr.push(itemToAdd);
-    }
-  })
+
+  //Partial application is necessary to reduce arity of filter function, so that we can filter the new row with the old guids.
+  const filterFunc = filterDuplicates(oldGuids);
+  const noDupes = newFeed.items.filter(filterFunc);
+  console.log(startCount - noDupes.length + ' duplicates removed.');
+
+  const itemsArr = noDupes.filter(filterKeywords);
+  console.log(noDupes.length - itemsArr.length + ' items matching keywords removed.')
   const endCount = itemsArr.length;
   let items = itemsArr.join();
   items = items + ';';
+
   console.log('filterArray function removed ' + (startCount - endCount) + ' items and finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
   return items;
 }
+
+// Eliminates dupes and other irrelevant rows from the feed. 
+// function OLDfilterArray(newFeed, oldGuids) {
+//   const t0 = process.hrtime();
+//   const startCount = newFeed.items.length;
+//   console.log('filterArray function started with ' + startCount + ' items.');
+//   let itemsArr = [];
+//   newFeed.items.forEach((item) => {
+//     if ((oldGuids.rows.includes(item.guid) === false) && 
+//        (item.content.includes('NJ TRANSIT Printable Timetables') === false) &&
+//        (item.content.includes('Service Adjustments Required to Advance Positive Train Control (PTC)') === false)) {
+//       const itemToAdd = ` ('${item.title}', '${item.content}', '${item.link}', '${item.pubDate}', '${item.guid}', 1)`;
+//       itemsArr.push(itemToAdd);
+//     }
+//   })
+//   const endCount = itemsArr.length;
+//   let items = itemsArr.join();
+//   items = items + ';';
+//   console.log('filterArray function removed ' + (startCount - endCount) + ' items and finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
+//   return items;
+// }
 
 async function writeItemsToDb(writeItems, startTime) {
   const t0 = process.hrtime();
@@ -89,7 +125,7 @@ async function writeItemsToDb(writeItems, startTime) {
     .then((res) => {
       client.end();
       console.log('writeItemsToDb wrote ' + res.rowCount  + ' rows and finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
-      console.log('RSS Sorter Lambda took ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds to run.')
+      console.log('RSS Sorter Lambda took ' + ((process.hrtime(startTime)[1]) / 1e9) + ' seconds to run.')
     })
   }
   catch(e) {
