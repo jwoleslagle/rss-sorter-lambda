@@ -87,8 +87,12 @@ function filterArray(newFeed, oldGuids) {
 
   const itemsArr = noDupes.filter(filterKeywords);
   console.log(noDupes.length - itemsArr.length + ' items matching keywords removed.')
-  const endCount = itemsArr.length;
-  let items = itemsArr.join();
+  const test = JSON.stringify(itemsArr);
+  test.replace("{","(");
+  test.replace("}",")");
+  console.log(test);
+  //TODO: ERROR IS OCCURRING ON NEXT LINE
+  let items = test.join();
   items = items + ';';
 
   console.log('filterArray function removed ' + (startCount - endCount) + ' items and finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
