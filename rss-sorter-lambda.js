@@ -11,7 +11,7 @@ let parser = new Parser();
 // NOTE: Be sure to set up env variables in the lambda.
 // For testing, a .env file is required that looks like this:
 // PGHOST=<DB ENDPOINT>.us-east-2.rds.amazonaws.com
-// PGUSER=rss_sorter_admin
+// PGUSER=<USER>
 // PGPASS=<PASSSWORD>
 // PGPORT=5432
 // PGDATABASE="rssSorter"
@@ -61,7 +61,6 @@ async function last100Items() {
   catch(e) {
     console.log(`DB read error: ${e}`);
   }
-
 }
 
 // Eliminates dupes and other irrelevant rows from the feed. 
@@ -70,13 +69,22 @@ function filterArray(newFeed, oldGuids) {
   const startCount = newFeed.items.length;
   console.log('filterArray function started with ' + startCount + ' items.');
   let itemsArr = [];
+  //Filter feed for dupes and spam rows
   newFeed.items.forEach((item) => {
     if ((oldGuids.includes(item.guid) === false) && 
        (item.content.includes('NJ TRANSIT Printable Timetables') === false) &&
        (item.content.includes('Service Adjustments Required to Advance Positive Train Control (PTC)') === false)) {
-      const itemToAdd = ` ('${item.title}', '${item.content}', '${item.link}', '${item.pubDate}', '${item.guid}', 1)`;
+      let itemToAdd = ` ('${item.title}', '${item.content}', '${item.link}', '${item.pubDate}', '${item.guid}', 1)`;
       itemsArr.push(itemToAdd);
     }
+  })
+  //Mark booleans as true that match conditions, then increases priority if any conditions are met.
+  itemsArr.forEach((item) => {
+    //TODO ERROR HERE cannot mutate object this way
+    if (item.includes('cancel')) { item.cancelTF = true };
+    if (item.includes('delay')) { item.delayTF = true };
+    if (item.includes('change' || 'replace')) { item.changeTF = true };
+    if (item.cancelTF || item.delayTF || item.changeTF) {item.priority = 'High'};
   })
   const endCount = itemsArr.length;
   let items = itemsArr.join();
@@ -89,7 +97,7 @@ async function writeItemsToDb(writeItems, startTime) {
   const t0 = process.hrtime();
   console.log('Write feed to DB started.')
   try {
-    await client.query(`INSERT INTO "feedDetails" ("title", "description", "link", "pubDate", "guid", "feedID")
+    await client.query(`INSERT INTO "feedDetails" ("title", "description", "link", "pubDate", "guid", "feedID", "cancelTF", "delayTF", "changeTF", "priority")
       VALUES ${writeItems};`)
     .then((res) => {
       client.end();
