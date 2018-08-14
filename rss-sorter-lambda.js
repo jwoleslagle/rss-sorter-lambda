@@ -63,6 +63,23 @@ async function last100Items() {
   }
 }
 
+function lineLookup(desc) {
+  let line = [];
+  if (desc.includes('ACRL')) { return 'ACRL' } // Atlantic City Regional Line
+  if (desc.includes('MOBO')) { line.push('MOBO') } // Montclair-Boonton Line
+  if (desc.includes('MBPJ')) { line.push('MBPJ') } // Main / Bergen / Port Jervis Line
+  if (desc.includes('M&E')) { line.push('M&E') } // Morris & Essex Line
+  if (desc.includes('NEC')) { line.push('NEC') } // Northeast Corridor
+  if (desc.includes('NJCL')) { line.push('NJCL') } // North Jersey Coast Line
+  if (desc.includes('PVL')) { line.push('PVL') } // Pascack Valley Line
+  if (desc.includes('RVL')) { line.push('RVL') } // Raritan Valley Line
+  return line;
+}
+
+function stationLookup(descr) {
+  //TODO write this function
+}
+
 // Eliminates dupes and other irrelevant rows from the feed. 
 function filterArray(newFeed, oldGuids) {
   const t0 = process.hrtime();
@@ -74,17 +91,15 @@ function filterArray(newFeed, oldGuids) {
     if ((oldGuids.includes(item.guid) === false) && 
        (item.content.includes('NJ TRANSIT Printable Timetables') === false) &&
        (item.content.includes('Service Adjustments Required to Advance Positive Train Control (PTC)') === false)) {
-      let itemToAdd = ` ('${item.title}', '${item.content}', '${item.link}', '${item.pubDate}', '${item.guid}', 1)`;
-      itemsArr.push(itemToAdd);
+      //Mark booleans as true that match conditions, then increases priority if any conditions are met.
+      const itemContent = item.content;
+      if (itemContent.includes('cancel')) { item.cancelTF = true };
+      if (itemContent.includes('delay')) { item.delayTF = true };
+      if (itemContent.includes('change' || 'replace')) { item.changeTF = true };
+      if (item.cancelTF || item.delayTF || item.changeTF) {item.priority = 'High'};
+      item.line = lineLookup(itemContent);
+      itemsArr.push(item);
     }
-  })
-  //Mark booleans as true that match conditions, then increases priority if any conditions are met.
-  itemsArr.forEach((item) => {
-    //TODO ERROR HERE cannot mutate object this way
-    if (item.includes('cancel')) { item.cancelTF = true };
-    if (item.includes('delay')) { item.delayTF = true };
-    if (item.includes('change' || 'replace')) { item.changeTF = true };
-    if (item.cancelTF || item.delayTF || item.changeTF) {item.priority = 'High'};
   })
   const endCount = itemsArr.length;
   let items = itemsArr.join();
