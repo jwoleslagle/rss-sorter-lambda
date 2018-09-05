@@ -65,14 +65,15 @@ async function last100Items() {
 
 function lineLookup(desc) {
   let line = [];
-  if (desc.includes('ACRL')) { return 'ACRL' } // Atlantic City Regional Line
-  if (desc.includes('MOBO')) { line.push('MOBO') } // Montclair-Boonton Line
-  if (desc.includes('MBPJ')) { line.push('MBPJ') } // Main / Bergen / Port Jervis Line
-  if (desc.includes('M&E')) { line.push('M&E') } // Morris & Essex Line
-  if (desc.includes('NEC')) { line.push('NEC') } // Northeast Corridor
-  if (desc.includes('NJCL')) { line.push('NJCL') } // North Jersey Coast Line
-  if (desc.includes('PVL')) { line.push('PVL') } // Pascack Valley Line
-  if (desc.includes('RVL')) { line.push('RVL') } // Raritan Valley Line
+  if (desc.includes('ACRL') || desc.includes('Atlantic City Rail Line')) { line.push('ACRL')};
+  if (desc.includes('MOBO') || desc.includes('Montclair-Boonton Line')) { line.push('MOBO')};
+  if (desc.includes('MBPJ') || desc.includes('Main / Bergen / Port Jervis Line') || desc.includes('Main/Bergen/Port Jervis Line')) { line.push('MBPJ')};
+  if (desc.includes('M&E') || desc.includes('Morris and Essex Line') || desc.includes('Morris & Essex Line') || desc.includes('Gladstone Line') || desc.includes('Gladstone Branch')) { line.push('M&E') };
+  if (desc.includes('NEC') || desc.includes('Northeast Corridor')) { line.push('NEC') };
+  if (desc.includes('NJCL') || desc.includes('North Jersey Coast Line')) { line.push('NJCL') };
+  if (desc.includes('PVL') || desc.includes('Pascack Valley Line')) { line.push('PVL') };
+  if (desc.includes('RVL') || desc.includes('Raritan Valley Line')) { line.push('RVL') };
+  if (line.length === 0) { line.push('')};
   return line;
 }
 
@@ -80,7 +81,7 @@ function stationLookup(descr) {
   //TODO write this function
 }
 
-// Eliminates dupes and other irrelevant rows from the feed. 
+// Eliminates dupes and other irrelevant rows from the feed, then tags the entry with line, priority, and late / change / cancel booleans. 
 function filterArray(newFeed, oldGuids) {
   const t0 = process.hrtime();
   const startCount = newFeed.items.length;
@@ -88,32 +89,58 @@ function filterArray(newFeed, oldGuids) {
   let itemsArr = [];
   //Filter feed for dupes and spam rows
   newFeed.items.forEach((item) => {
+    item.cancelTF = false;
+    item.delayTF = false;
+    item.changeTF = false;
+    item.priority = 'Low';
+    item.line = '';
     if ((oldGuids.includes(item.guid) === false) && 
        (item.content.includes('NJ TRANSIT Printable Timetables') === false) &&
        (item.content.includes('Service Adjustments Required to Advance Positive Train Control (PTC)') === false)) {
       //Mark booleans as true that match conditions, then increases priority if any conditions are met.
-      const itemContent = item.content;
-      if (itemContent.includes('cancel')) { item.cancelTF = true };
-      if (itemContent.includes('delay')) { item.delayTF = true };
-      if (itemContent.includes('change' || 'replace')) { item.changeTF = true };
+      let itemContent = item.content.toString();
+      let itemContentToLower = itemContent.toLowerCase();
+      if (itemContentToLower.includes('cancel')) { item.cancelTF = true };
+      if (itemContentToLower.includes('late') || itemContentToLower.includes('delay')) { item.delayTF = true };
+      if (itemContentToLower.includes('change') || itemContentToLower.includes('replace')) { item.changeTF = true };
       if (item.cancelTF || item.delayTF || item.changeTF) {item.priority = 'High'};
       item.line = lineLookup(itemContent);
       itemsArr.push(item);
     }
   })
   const endCount = itemsArr.length;
-  let items = itemsArr.join();
-  items = items + ';';
   console.log('filterArray function removed ' + (startCount - endCount) + ' items and finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
-  return items;
+  return itemsArr;
 }
 
-async function writeItemsToDb(writeItems, startTime) {
+function entryStringifier(entriesArr) {
+  let bigString = '';
+  entriesArr.forEach((e) => {
+    let littleString = '(' + 
+      e.title + ', ' + 
+      e.content + ', ' +
+      e.link + ', ' + 
+      e.pubDate + ', ' + 
+      e.guid + ', ' + 
+      e.feedID + ', ' + 
+      e.cancelTF + ', ' + 
+      e.delayTF + ', ' +
+      e.cancelTF + ', ' + 
+      e.changeTF + ', ' + 
+      e.priority + ', ' + 
+      e.line + '), ';
+    bigString += littleString;
+  })
+  console.log(bigString);
+  return bigString;
+}
+
+async function writeItemsToDb(writeArr, startTime) {
   const t0 = process.hrtime();
   console.log('Write feed to DB started.')
   try {
     await client.query(`INSERT INTO "feedDetails" ("title", "description", "link", "pubDate", "guid", "feedID", "cancelTF", "delayTF", "changeTF", "priority")
-      VALUES ${writeItems};`)
+      VALUES ${entryStringifier(writeArr)};`)
     .then((res) => {
       client.end();
       console.log('writeItemsToDb wrote ' + res.rowCount  + ' rows and finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
@@ -125,6 +152,7 @@ async function writeItemsToDb(writeItems, startTime) {
   }
 }
 
+//Main function
 (async() => {
   const overallT0 = process.hrtime();
   let RSSFeedURL = 'https://www.njtransit.com/rss/RailAdvisories_feed.xml';
@@ -133,9 +161,9 @@ async function writeItemsToDb(writeItems, startTime) {
   await Promise.all([feedPromise, guidArrayPromise]).then((values) => {
     let feed = values[0];
     let oldGuidArray = values[1]; 
-    const writeString = filterArray(feed, oldGuidArray);
-    if (writeString.length > 1) {
-      writeItemsToDb(writeString, overallT0);
+    const writeArray = filterArray(feed, oldGuidArray);
+    if (writeArray.length > 0) {
+      writeItemsToDb(writeArray, overallT0);
     } else {
       console.log('writeItemsToDb wrote 0 rows (All items were duplicates or matched keywords).');
       console.log('RSS Sorter Lambda took ' + ((process.hrtime(overallT0)[1]) / 1e9) + ' seconds to run.')
