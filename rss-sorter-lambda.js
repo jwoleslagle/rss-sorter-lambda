@@ -116,31 +116,32 @@ function filterArray(newFeed, oldGuids) {
 function entryStringifier(entriesArr) {
   let bigString = '';
   entriesArr.forEach((e) => {
-    let littleString = '(' + 
-      e.title + ', ' + 
-      e.content + ', ' +
-      e.link + ', ' + 
-      e.pubDate + ', ' + 
-      e.guid + ', ' + 
-      e.feedID + ', ' + 
+    let littleString = '("' + 
+      e.title + '", "' + 
+      e.content + '", "' +
+      e.link + '", ' + 
+      e.pubDate + ', "' + 
+      e.guid + '", "' + 
+      e.feedID + '", ' + 
       e.cancelTF + ', ' + 
       e.delayTF + ', ' +
       e.cancelTF + ', ' + 
-      e.changeTF + ', ' + 
-      e.priority + ', ' + 
-      e.line + '), ';
+      e.changeTF + ', "' + 
+      e.priority + '", ' + 
+      e.line 
+      + '), ';
     bigString += littleString;
   })
-  console.log(bigString);
   return bigString;
 }
 
 async function writeItemsToDb(writeArr, startTime) {
   const t0 = process.hrtime();
   console.log('Write feed to DB started.')
+  const dbInputString = entryStringifier(writeArr);
   try {
-    await client.query(`INSERT INTO "feedDetails" ("title", "description", "link", "pubDate", "guid", "feedID", "cancelTF", "delayTF", "changeTF", "priority")
-      VALUES ${entryStringifier(writeArr)};`)
+    await client.query(`INSERT INTO "feedDetails" ("title", "description", "link", "pubDate", "guid", "feedID", "cancelTF", "delayTF", "changeTF", "priority", "line")
+      VALUES ${dbInputString};`)
     .then((res) => {
       client.end();
       console.log('writeItemsToDb wrote ' + res.rowCount  + ' rows and finished in ' + ((process.hrtime(t0)[1]) / 1e9) + ' seconds.');
