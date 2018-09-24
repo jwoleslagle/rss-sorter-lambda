@@ -93,6 +93,7 @@ function filterArray(newFeed, oldGuids) {
     item.delayTF = false;
     item.changeTF = false;
     item.priority = 'Low';
+    item.feedID = 1;
     item.line = '';
     if ((oldGuids.includes(item.guid) === false) && 
        (item.content.includes('NJ TRANSIT Printable Timetables') === false) &&
@@ -113,25 +114,26 @@ function filterArray(newFeed, oldGuids) {
   return itemsArr;
 }
 
+//entryStringifier transforms the raw RSS object into a postgres insert-friendly string.
 function entryStringifier(entriesArr) {
   let bigString = '';
   entriesArr.forEach((e) => {
-    let littleString = '("' + 
-      e.title + '", "' + 
-      e.content + '", "' +
-      e.link + '", ' + 
-      e.pubDate + ', "' + 
-      e.guid + '", "' + 
-      e.feedID + '", ' + 
-      e.cancelTF + ', ' + 
-      e.delayTF + ', ' +
-      e.cancelTF + ', ' + 
-      e.changeTF + ', "' + 
-      e.priority + '", ' + 
-      e.line 
-      + '), ';
+    let littleString = `(
+    '${e.title}',
+    '${e.link}', 
+    '${e.pubDate}',
+    '${e.guid}',
+     ${e.feedID},
+     ${e.cancelTF}, 
+     ${e.delayTF},
+     ${e.changeTF},
+    '${e.priority}',
+     ${e.line ? '[' + e.line + ']' : ''}
+     ),`;
     bigString += littleString;
-  })
+  });
+  //remove the last comma and put a semicolon in its place
+  const finalString = bigString.substr(0, bigString.length - 1) + ";";
   return bigString;
 }
 
@@ -140,7 +142,7 @@ async function writeItemsToDb(writeArr, startTime) {
   console.log('Write feed to DB started.')
   const dbInputString = entryStringifier(writeArr);
   try {
-    await client.query(`INSERT INTO "feedDetails" ("title", "description", "link", "pubDate", "guid", "feedID", "cancelTF", "delayTF", "changeTF", "priority", "line")
+    await client.query(`INSERT INTO "feedDetails" (title, content, link, "pubDate", guid, "feedID", "cancelTF", "delayTF", "changeTF", priority)
       VALUES ${dbInputString};`)
     .then((res) => {
       client.end();
