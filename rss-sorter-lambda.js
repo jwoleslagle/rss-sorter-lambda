@@ -120,7 +120,7 @@ function entryStringifier(entriesArr) {
   entriesArr.forEach((e) => {
     let littleString = `(
     '${e.title}',
-    '${e.content},
+    '${e.content}',
     '${e.link}', 
     '${e.pubDate}',
     '${e.guid}',
