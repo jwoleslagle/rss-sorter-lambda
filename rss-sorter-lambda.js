@@ -120,6 +120,7 @@ function entryStringifier(entriesArr) {
   entriesArr.forEach((e) => {
     let littleString = `(
     '${e.title}',
+    '${e.content},
     '${e.link}', 
     '${e.pubDate}',
     '${e.guid}',
@@ -128,13 +129,13 @@ function entryStringifier(entriesArr) {
      ${e.delayTF},
      ${e.changeTF},
     '${e.priority}',
-     ${e.line ? '[' + e.line + ']' : ''}
+    '${e.line ? `{ ${e.line} }` : `{}`}'
      ),`;
     bigString += littleString;
   });
   //remove the last comma and put a semicolon in its place
   const finalString = bigString.substr(0, bigString.length - 1) + ";";
-  return bigString;
+  return finalString;
 }
 
 async function writeItemsToDb(writeArr, startTime) {
@@ -142,7 +143,7 @@ async function writeItemsToDb(writeArr, startTime) {
   console.log('Write feed to DB started.')
   const dbInputString = entryStringifier(writeArr);
   try {
-    await client.query(`INSERT INTO "feedDetails" (title, content, link, "pubDate", guid, "feedID", "cancelTF", "delayTF", "changeTF", priority)
+    await client.query(`INSERT INTO "feedDetails" (title, content, link, "pubDate", guid, "feedID", "cancelTF", "delayTF", "changeTF", priority, line)
       VALUES ${dbInputString};`)
     .then((res) => {
       client.end();
